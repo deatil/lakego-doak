@@ -8,6 +8,7 @@ import (
 
     "github.com/mojocn/base64Captcha"
 
+    "github.com/deatil/lakego-doak/lakego/array"
     "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/facade/config"
     "github.com/deatil/lakego-doak/lakego/captcha"
@@ -57,7 +58,7 @@ func Captcha(driverName string, storeName string, once ...bool) captcha.Captcha 
     }
 
     // 配置
-    storeConf := storeConfig.(map[string]interface{})
+    storeConf := storeConfig.(map[string]any)
 
     storeType := storeConf["type"].(string)
     store := register.
@@ -80,7 +81,7 @@ func Captcha(driverName string, storeName string, once ...bool) captcha.Captcha 
     }
 
     // 驱动配置
-    driverConf := driverConfig.(map[string]interface{})
+    driverConf := driverConfig.(map[string]any)
 
     driverType := driverConf["type"].(string)
     driver := register.
@@ -93,14 +94,14 @@ func Captcha(driverName string, storeName string, once ...bool) captcha.Captcha 
     return captcha.New(driver.(interfaces.Driver), store.(interfaces.Store))
 }
 
-// 默认存储
-func GetDefaultStore() string {
-    return config.New("captcha").GetString("DefaultStore")
-}
-
 // 默认驱动
 func GetDefaultDriver() string {
-    return config.New("captcha").GetString("DefaultDriver")
+    return config.New("captcha").GetString("default-driver")
+}
+
+// 默认存储
+func GetDefaultStore() string {
+    return config.New("captcha").GetString("default-store")
 }
 
 // 注册
@@ -109,25 +110,56 @@ func Register() {
         // 注册存储
         register.
             NewManagerWithPrefix("captcha-store").
-            RegisterMany(map[string]func(map[string]interface{}) interface{} {
-                "redis": func(conf map[string]interface{}) interface{} {
-                    store := &redisStore.Redis{}
+            RegisterMany(map[string]func(map[string]any) any {
+                "redis": func(conf map[string]any) any {
+                    addr := array.ArrGetWithGoch(conf, "addr").ToString()
+                    password := array.ArrGetWithGoch(conf, "password").ToString()
 
-                    store.WithConfig(conf)
-                    store.Init()
+                    db := array.ArrGetWithGoch(conf, "db").ToInt()
+
+                    minIdleConn := array.ArrGetWithGoch(conf, "minidle-conn").ToInt()
+                    dialTimeout := array.ArrGetWithGoch(conf, "dial-timeout").ToDuration()
+                    readTimeout := array.ArrGetWithGoch(conf, "read-timeout").ToDuration()
+                    writeTimeout := array.ArrGetWithGoch(conf, "write-timeout").ToDuration()
+
+                    poolSize := array.ArrGetWithGoch(conf, "pool-size").ToInt()
+                    poolTimeout := array.ArrGetWithGoch(conf, "pool-timeout").ToDuration()
+
+                    enabletrace := array.ArrGetWithGoch(conf, "enabletrace").ToBool()
+
+                    keyPrefix := array.ArrGetWithGoch(conf, "key-prefix").ToString()
+                    ttl       := array.ArrGetWithGoch(conf, "ttl").ToInt()
+
+                    store := redisStore.New(redisStore.Config{
+                        DB:       db,
+                        Addr:     addr,
+                        Password: password,
+
+                        MinIdleConn:  minIdleConn,
+                        DialTimeout:  dialTimeout,
+                        ReadTimeout:  readTimeout,
+                        WriteTimeout: writeTimeout,
+                        PoolSize:     poolSize,
+                        PoolTimeout:  poolTimeout,
+
+                        EnableTrace:  enabletrace,
+
+                        KeyPrefix:    keyPrefix,
+                        TTL:          ttl,
+                    })
 
                     return store
                 },
                 // 验证码包该驱动有问题
-                "syncmap": func(conf map[string]interface{}) interface{} {
+                "syncmap": func(conf map[string]any) any {
                     liveTime := time.Minute * time.Duration(int64(conf["livetime"].(int)))
 
                     syncmap := base64Captcha.NewStoreSyncMap(liveTime)
 
                     return syncmap
                 },
-                "memory": func(conf map[string]interface{}) interface{} {
-                    collectNum := conf["collectnum"].(int)
+                "memory": func(conf map[string]any) any {
+                    collectNum := conf["collect-num"].(int)
                     expiration := time.Minute * time.Duration(int64(conf["expiration"].(int)))
 
                     memory := base64Captcha.NewMemoryStore(collectNum, expiration)
@@ -139,9 +171,9 @@ func Register() {
         // 注册驱动
         register.
             NewManagerWithPrefix("captcha-driver").
-            RegisterMany(map[string]func(map[string]interface{}) interface{} {
+            RegisterMany(map[string]func(map[string]any) any {
                 // 字符
-                "string": func(conf map[string]interface{}) interface{} {
+                "string": func(conf map[string]any) any {
                     /*
                     //go:embed fonts/*.ttf
                     //go:embed fonts/*.ttc
@@ -151,9 +183,9 @@ func Register() {
                     var fontsStorage *base64Captcha.EmbeddedFontsStorage = base64Captcha.NewEmbeddedFontsStorage(embeddedFontsFS)
                     */
 
-                    bgColor := conf["bgcolor"].(map[string]interface{})
+                    bgColor := conf["bgcolor"].(map[string]any)
 
-                    fonts := conf["fonts"].([]interface{})
+                    fonts := conf["fonts"].([]any)
                     newFonts := make([]string, 0)
                     for _, font := range fonts {
                         newFonts = append(newFonts, font.(string))
@@ -162,8 +194,8 @@ func Register() {
                     cd := base64Captcha.NewDriverString(
                         conf["height"].(int),
                         conf["width"].(int),
-                        conf["noisecount"].(int),
-                        conf["showlineoptions"].(int),
+                        conf["noise-count"].(int),
+                        conf["showline-options"].(int),
                         conf["length"].(int),
                         conf["source"].(string),
                         &color.RGBA{
@@ -182,10 +214,10 @@ func Register() {
                     return driver
                 },
                 // 中文
-                "chinese": func(conf map[string]interface{}) interface{} {
-                    bgColor := conf["bgcolor"].(map[string]interface{})
+                "chinese": func(conf map[string]any) any {
+                    bgColor := conf["bgcolor"].(map[string]any)
 
-                    fonts := conf["fonts"].([]interface{})
+                    fonts := conf["fonts"].([]any)
                     newFonts := make([]string, 0)
                     for _, font := range fonts {
                         newFonts = append(newFonts, font.(string))
@@ -194,8 +226,8 @@ func Register() {
                     cd := base64Captcha.NewDriverChinese(
                         conf["height"].(int),
                         conf["width"].(int),
-                        conf["noisecount"].(int),
-                        conf["showlineoptions"].(int),
+                        conf["noise-count"].(int),
+                        conf["showline-options"].(int),
                         conf["length"].(int),
                         conf["source"].(string),
                         &color.RGBA{
@@ -214,10 +246,10 @@ func Register() {
                     return driver
                 },
                 // 数学公式
-                "math": func(conf map[string]interface{}) interface{} {
-                    bgColor := conf["bgcolor"].(map[string]interface{})
+                "math": func(conf map[string]any) any {
+                    bgColor := conf["bgcolor"].(map[string]any)
 
-                    fonts := conf["fonts"].([]interface{})
+                    fonts := conf["fonts"].([]any)
                     newFonts := make([]string, 0)
                     for _, font := range fonts {
                         newFonts = append(newFonts, font.(string))
@@ -226,8 +258,8 @@ func Register() {
                     cd := base64Captcha.NewDriverMath(
                         conf["height"].(int),
                         conf["width"].(int),
-                        conf["noisecount"].(int),
-                        conf["showlineoptions"].(int),
+                        conf["noise-count"].(int),
+                        conf["showline-options"].(int),
                         &color.RGBA{
                             R: uint8(bgColor["r"].(int)),
                             G: uint8(bgColor["g"].(int)),
@@ -244,7 +276,7 @@ func Register() {
                     return driver
                 },
                 // 音频
-                "audio": func(conf map[string]interface{}) interface{} {
+                "audio": func(conf map[string]any) any {
                     driver := base64Captcha.NewDriverAudio(
                         conf["length"].(int),
                         conf["language"].(string),
@@ -253,13 +285,13 @@ func Register() {
                     return driver
                 },
                 // digit
-                "digit": func(conf map[string]interface{}) interface{} {
+                "digit": func(conf map[string]any) any {
                     driver := base64Captcha.NewDriverDigit(
                         conf["height"].(int),
                         conf["width"].(int),
                         conf["length"].(int),
-                        conf["maxskew"].(float64),
-                        conf["dotcount"].(int),
+                        conf["max-skew"].(float64),
+                        conf["dot-count"].(int),
                     )
 
                     return driver

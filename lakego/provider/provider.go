@@ -11,7 +11,6 @@ import (
     "github.com/deatil/lakego-doak/lakego/config/adapter"
     pathTool "github.com/deatil/lakego-doak/lakego/path"
     appInterface "github.com/deatil/lakego-doak/lakego/app/interfaces"
-    routerFacade "github.com/deatil/lakego-doak/lakego/facade/router"
 )
 
 /**
@@ -35,7 +34,7 @@ type ServiceProvider struct {
 }
 
 // 设置
-func (this *ServiceProvider) WithApp(app interface{}) {
+func (this *ServiceProvider) WithApp(app any) {
     this.App = app.(appInterface.App)
 }
 
@@ -62,7 +61,7 @@ func (this *ServiceProvider) AddCommand(cmd *command.Command) {
 }
 
 // 添加脚本
-func (this *ServiceProvider) AddCommands(cmds []interface{}) {
+func (this *ServiceProvider) AddCommands(cmds []any) {
     for _, cmd := range cmds {
         this.AddCommand(cmd.(*command.Command))
     }
@@ -90,7 +89,7 @@ func (this *ServiceProvider) AddGroup(conf map[string]string, f func(*router.Rou
     }
 
     // 中间件
-    groupMiddlewares := routerFacade.GetMiddlewares(middleware)
+    groupMiddlewares := router.GetMiddlewares(middleware)
 
     // 使用中间件
     this.AddRoute(func(engine *router.Engine) {
@@ -162,7 +161,7 @@ func (this *ServiceProvider) LoadViewsFrom(path string, namespace string) {
 }
 
 // 推送
-func (this *ServiceProvider) Publishes(obj interface{}, paths map[string]string, group string) {
+func (this *ServiceProvider) Publishes(obj any, paths map[string]string, group string) {
     publish.Instance().Publish(obj, paths, group)
 }
 

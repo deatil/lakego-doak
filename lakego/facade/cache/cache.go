@@ -4,6 +4,7 @@ import (
     "sync"
     "strings"
 
+    "github.com/deatil/lakego-doak/lakego/array"
     "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/facade/config"
     "github.com/deatil/lakego-doak/lakego/cache"
@@ -13,6 +14,10 @@ import (
 
 /**
  * 缓存
+ *
+ * cache.New().Put("lakego-cache", "lakego-cache-data", 122222)
+ * cache.New().Forever("lakego-cache-forever", "lakego-cache-Forever-data")
+ * cacheData, err := cache.New().Get("lakego-cache")
  *
  * @create 2021-7-3
  * @author deatil
@@ -27,20 +32,22 @@ func init() {
 }
 
 // 实例化
-func New(once ...bool) interfaces.Cache {
+func New(once ...bool) *cache.Cache {
     name := GetDefaultCache()
 
     return Cache(name, once...)
 }
 
 // 实例化
-func NewWithType(name string, once ...bool) interfaces.Cache {
+func NewWithType(name string, once ...bool) *cache.Cache {
     return Cache(name, once...)
 }
 
-func Cache(name string, once ...bool) interfaces.Cache {
+func Cache(name string, once ...bool) *cache.Cache {
+    conf := config.New("cache")
+
     // 缓存列表
-    caches := config.New("cache").GetStringMap("Caches")
+    caches := conf.GetStringMap("caches")
 
     // 转为小写
     name = strings.ToLower(name)
@@ -52,7 +59,7 @@ func Cache(name string, once ...bool) interfaces.Cache {
     }
 
     // 配置
-    driverConf := driverConfig.(map[string]interface{})
+    driverConf := driverConfig.(map[string]any)
 
     driverType := driverConf["type"].(string)
     driver := register.
@@ -64,11 +71,15 @@ func Cache(name string, once ...bool) interfaces.Cache {
 
     c := cache.New(driver.(interfaces.Driver), driverConf)
 
+    // 前缀
+    keyPrefix := conf.GetString("key-prefix")
+    c.WithPrefix(keyPrefix)
+
     return c
 }
 
 func GetDefaultCache() string {
-    return config.New("cache").GetString("Default")
+    return config.New("cache").GetString("default")
 }
 
 // 注册
@@ -77,13 +88,35 @@ func Register() {
         // 注册缓存驱动
         register.
             NewManagerWithPrefix("cache").
-            Register("redis", func(conf map[string]interface{}) interface{} {
-                prefix := conf["prefix"].(string)
+            Register("redis", func(conf map[string]any) any {
+                addr     := array.ArrGetWithGoch(conf, "addr").ToString()
+                password := array.ArrGetWithGoch(conf, "password").ToString()
+                db       := array.ArrGetWithGoch(conf, "db").ToInt()
 
-                driver := &redisDriver.Redis{}
+                minIdleConn  := array.ArrGetWithGoch(conf, "minidle-conn").ToInt()
+                dialTimeout  := array.ArrGetWithGoch(conf, "dial-timeout").ToDuration()
+                readTimeout  := array.ArrGetWithGoch(conf, "read-timeout").ToDuration()
+                writeTimeout := array.ArrGetWithGoch(conf, "write-timeout").ToDuration()
 
-                driver.Init(conf)
-                driver.SetPrefix(prefix)
+                poolSize    := array.ArrGetWithGoch(conf, "pool-size").ToInt()
+                poolTimeout := array.ArrGetWithGoch(conf, "pool-timeout").ToDuration()
+
+                enabletrace := array.ArrGetWithGoch(conf, "enabletrace").ToBool()
+
+                driver := redisDriver.New(redisDriver.Config{
+                    DB:       db,
+                    Addr:     addr,
+                    Password: password,
+
+                    MinIdleConn:  minIdleConn,
+                    DialTimeout:  dialTimeout,
+                    ReadTimeout:  readTimeout,
+                    WriteTimeout: writeTimeout,
+                    PoolSize:     poolSize,
+                    PoolTimeout:  poolTimeout,
+
+                    EnableTrace:  enabletrace,
+                })
 
                 return driver
             })

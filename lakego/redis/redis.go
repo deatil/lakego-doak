@@ -10,43 +10,44 @@ import (
     "github.com/go-redis/redis/v8"
     "github.com/go-redis/redis/extra/redisotel/v8"
 
-    "github.com/deatil/lakego-doak/lakego/logger"
+    "github.com/deatil/go-goch/goch"
+    "github.com/deatil/lakego-doak/lakego/facade/logger"
 )
 
-// redis
+// 构造函数
 func New(config Config) Redis {
-    mainDB := config.DB
+    db := config.DB
     addr := config.Addr
     password := config.Password
     keyPrefix := config.KeyPrefix
 
     minIdleConn := config.MinIdleConn
     dialTimeout := config.DialTimeout
-    readTimeout := config.minIdleConn
-    writeTimeout := config.minIdleConn
-    poolSize := config.minIdleConn
-    poolTimeout := config.minIdleConn
+    readTimeout := config.ReadTimeout
+    writeTimeout := config.WriteTimeout
+    poolSize := config.PoolSize
+    poolTimeout := config.PoolTimeout
 
     enabletrace := config.EnableTrace
 
     client := redis.NewClient(&redis.Options{
         Addr:     addr,
         Password: password,
-        DB:       mainDB,
+        DB:       db,
 
         MinIdleConns: minIdleConn,
         DialTimeout:  dialTimeout,
-        ReadTimeout:  ReadTimeout,
-        WriteTimeout: WriteTimeout,
-        PoolSize:     PoolSize,
-        PoolTimeout:  PoolTimeout,
+        ReadTimeout:  readTimeout,
+        WriteTimeout: writeTimeout,
+        PoolSize:     poolSize,
+        PoolTimeout:  poolTimeout,
     })
 
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
 
     if _, err := client.Ping(ctx).Result(); err != nil {
-        logger.Error(err.Error())
+        logger.New().Error(err.Error())
     }
 
     // 调试
@@ -55,8 +56,8 @@ func New(config Config) Redis {
     }
 
     return Redis{
-        client: client,
         prefix: keyPrefix,
+        client: client,
         cache: cache.New(&cache.Options{
             Redis:      client,
             LocalCache: cache.NewTinyLFU(1000, time.Minute),
@@ -66,11 +67,9 @@ func New(config Config) Redis {
 
 // 缓存配置
 type Config struct {
-    KeyPrefix string
-
-    Addr string
+    Addr     string
     Password string
-    DB int
+    DB       int
 
     MinIdleConn  int
     DialTimeout  time.Duration
@@ -80,6 +79,8 @@ type Config struct {
     PoolTimeout  time.Duration
 
     EnableTrace  bool
+
+    KeyPrefix    string
 }
 
 /**
@@ -89,15 +90,19 @@ type Config struct {
  * @author deatil
  */
 type Redis struct {
-    cache  *cache.Cache
-    client *redis.Client
+    // 前缀
     prefix string
-    config Config
+
+    // 缓存
+    cache  *cache.Cache
+
+    // 客户端
+    client *redis.Client
 }
 
 // 设置
-func (this Redis) Set(key string, value interface{}, expiration int) error {
-    ttl := this.FormatTime(expiration)
+func (this Redis) Set(key string, value any, expiration any) error {
+    ttl := this.formatTime(expiration)
 
     return this.cache.Set(&cache.Item{
         Ctx:            context.TODO(),
@@ -109,7 +114,7 @@ func (this Redis) Set(key string, value interface{}, expiration int) error {
 }
 
 // 获取
-func (this Redis) Get(key string, value interface{}) error {
+func (this Redis) Get(key string, value any) error {
     err := this.cache.Get(context.TODO(), this.wrapperKey(key), value)
     if err == cache.ErrCacheMiss {
         err = errors.New("Redis Key No Exist")
@@ -155,10 +160,14 @@ func (this Redis) GetClient() *redis.Client {
 
 // 包装 key 值
 func (this Redis) wrapperKey(key string) string {
+    if this.prefix == "" {
+        return key
+    }
+
     return fmt.Sprintf("%s:%s", this.prefix, key)
 }
 
-// int 时间格式化为 Duration 格式
-func (this Redis) FormatTime(t int) time.Duration {
-    return time.Second * time.Duration(int64(t))
+// 时间格式化
+func (this Redis) formatTime(t any) time.Duration {
+    return time.Second * goch.ToDuration(t)
 }
