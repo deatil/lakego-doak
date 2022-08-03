@@ -3,6 +3,7 @@ package kernel
 import (
     "os"
     "net"
+    "flag"
 
     "github.com/deatil/lakego-doak/lakego/app"
     "github.com/deatil/lakego-doak/lakego/command"
@@ -51,23 +52,18 @@ type Kernel struct {
     NetListener net.Listener
 }
 
-// 默认服务提供者
-func (this *Kernel) LoadDefaultServiceProvider() *Kernel {
-    this.WithServiceProvider(func() interfaces.ServiceProvider {
-        return serviceprovider.NewLakego()
-    })
-
-    return this
-}
-
 // 执行
 func (this *Kernel) Terminate() {
     args := os.Args
 
-    if len(args) > 1 {
-        this.RunCmd()
-    } else {
+    // 系统启动参数
+    startName := flag.String("lakego", "", "系统启动参数")
+    flag.Parse()
+
+    if len(args) == 1 || *startName == "start" {
         this.RunServer()
+    } else {
+        this.RunCmd()
     }
 }
 
@@ -146,5 +142,14 @@ func (this *Kernel) LoadServiceProvider() {
             provider.AppendProvider(p)
         }
     }
+}
+
+// 默认服务提供者
+func (this *Kernel) LoadDefaultServiceProvider() *Kernel {
+    this.WithServiceProvider(func() interfaces.ServiceProvider {
+        return serviceprovider.NewLakego()
+    })
+
+    return this
 }
 

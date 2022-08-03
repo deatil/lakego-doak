@@ -3,13 +3,14 @@ package provider
 import (
     "path/filepath"
     "github.com/deatil/lakego-filesystem/filesystem"
-    "github.com/deatil/lakego-doak/lakego/view"
     "github.com/deatil/lakego-doak/lakego/router"
     "github.com/deatil/lakego-doak/lakego/publish"
     "github.com/deatil/lakego-doak/lakego/command"
     "github.com/deatil/lakego-doak/lakego/facade/config"
     "github.com/deatil/lakego-doak/lakego/config/adapter"
     pathTool "github.com/deatil/lakego-doak/lakego/path"
+    viewFunc "github.com/deatil/lakego-doak/lakego/view/funcs"
+    viewFinder "github.com/deatil/lakego-doak/lakego/view/finder"
     appInterface "github.com/deatil/lakego-doak/lakego/app/interfaces"
 )
 
@@ -141,7 +142,7 @@ func (this *ServiceProvider) MergeConfigFrom(path string, key string) {
 
 // 注册视图
 func (this *ServiceProvider) LoadViewsFrom(path string, namespace string) {
-    viewFinder := view.InstanceViewFinder()
+    viewFinder := viewFinder.Instance()
 
     paths := config.New("view").GetStringSlice("paths")
     if len(paths) > 0 {
@@ -158,6 +159,11 @@ func (this *ServiceProvider) LoadViewsFrom(path string, namespace string) {
     path = pathTool.FormatPath(path)
 
     viewFinder.AddNamespace(namespace, []string{path})
+}
+
+// 添加视图用方法
+func (this *ServiceProvider) AddViewFunc(name string, fn any) {
+    viewFunc.Instance().AddFunc(name, fn)
 }
 
 // 推送
