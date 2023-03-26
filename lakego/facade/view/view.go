@@ -1,17 +1,15 @@
 package view
 
 import (
-    "sync"
     "strings"
 
+    "github.com/deatil/lakego-doak/lakego/array"
     "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/facade/config"
     "github.com/deatil/lakego-doak/lakego/view/html"
     "github.com/deatil/lakego-doak/lakego/view/html/interfaces"
     pongo2Adapter "github.com/deatil/lakego-doak/lakego/view/html/adapter/pongo2"
 )
-
-var once sync.Once
 
 // 初始化
 func init() {
@@ -46,12 +44,14 @@ func Html(name string, once ...bool) *html.Html {
     }
 
     // 配置
-    adapterConf := adapterConfig.(map[string]any)
+    adapterConf := array.ArrayFrom(adapterConfig)
 
-    adapterType := adapterConf["type"].(string)
+    adapterType := adapterConf.Value("type").ToString()
+    adapterCfg := adapterConf.All().ToStringMap()
+
     adapter := register.
         NewManagerWithPrefix("view").
-        GetRegister(adapterType, adapterConf, once...)
+        GetRegister(adapterType, adapterCfg, once...)
     if adapter == nil {
         panic("视图适配器[" + adapterType + "]没有被注册")
     }
@@ -68,18 +68,17 @@ func GetDefaultAdapter() string {
 
 // 注册
 func Register() {
-    once.Do(func() {
-        // 注册驱动
-        register.
-            NewManagerWithPrefix("view").
-            RegisterMany(map[string]func(map[string]any) any {
-                "pongo2": func(conf map[string]any) any {
-                    path := conf["tmpl-dir"].(string)
-                    adapter := pongo2Adapter.New(path)
+    // 注册驱动
+    register.
+        NewManagerWithPrefix("view").
+        RegisterMany(map[string]func(map[string]any) any {
+            "pongo2": func(conf map[string]any) any {
+                path := array.ArrayGet(conf, "tmpl-dir").ToString()
 
-                    return adapter
-                },
-            })
-    })
+                adapter := pongo2Adapter.New(path)
+
+                return adapter
+            },
+        })
 }
 

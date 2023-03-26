@@ -1,17 +1,17 @@
 package permission
 
 import (
-    "sync"
     "strings"
 
-    "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/path"
-    "github.com/deatil/lakego-doak/lakego/facade/database"
+    "github.com/deatil/lakego-doak/lakego/array"
+    "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/facade/config"
+    "github.com/deatil/lakego-doak/lakego/facade/database"
 
     "github.com/deatil/lakego-doak/lakego/permission"
     "github.com/deatil/lakego-doak/lakego/permission/interfaces"
-    gormAdapter "github.com/deatil/lakego-doak/lakego/permission/adapter/gorm"
+    gorm_adapter "github.com/deatil/lakego-doak/lakego/permission/adapter/gorm"
 )
 
 /**
@@ -20,7 +20,6 @@ import (
  * @create 2021-9-30
  * @author deatil
  */
-var once sync.Once
 
 // 初始化
 func init() {
@@ -54,19 +53,21 @@ func Permission(name string, once ...bool) *permission.Permission {
     }
 
     // 配置
-    permissionConfig := adapterConfig.(map[string]any)
+    permissionConfig := array.ArrayFrom(adapterConfig)
 
     // 获取驱动
-    permissionType := permissionConfig["type"].(string)
+    permissionType := permissionConfig.Value("type").ToString()
+    permissionCfg := permissionConfig.All().ToStringMap()
+
     adapter := register.
         NewManagerWithPrefix("permission").
-        GetRegister(permissionType, permissionConfig, once...)
+        GetRegister(permissionType, permissionCfg, once...)
     if adapter == nil {
         panic("权限适配器驱动[" + permissionType + "]没有被注册")
     }
 
     // 配置文件路径
-    configfile := permissionConfig["rbac-model"].(string)
+    configfile := permissionConfig.Value("rbac-model").ToString()
     modelConf := path.FormatPath(configfile)
 
     // 添加适配器
@@ -81,16 +82,12 @@ func GetDefaultAdapter() string {
 
 // 注册
 func Register() {
-    once.Do(func() {
-        // 注册可用驱动
-        register.
-            NewManagerWithPrefix("permission").
-            Register("gorm", func(conf map[string]any) any {
-                newDb := database.New()
+    // 注册可用驱动
+    register.
+        NewManagerWithPrefix("permission").
+        Register("gorm", func(conf map[string]any) any {
+            a, _ := gorm_adapter.New(database.New())
 
-                a, _ := gormAdapter.New(newDb)
-
-                return a
-            })
-    })
+            return a
+        })
 }
