@@ -3,7 +3,7 @@ package interfaces
 import (
     "github.com/deatil/lakego-doak/lakego/command"
     "github.com/deatil/lakego-doak/lakego/schedule"
-    provider_interface "github.com/deatil/lakego-doak/lakego/provider/interfaces"
+    iprovider "github.com/deatil/lakego-doak/lakego/provider/interfaces"
 )
 
 /**
@@ -14,10 +14,22 @@ import (
  */
 type App interface {
     // 注册服务提供者
-    Register(func() provider_interface.ServiceProvider)
+    Register(func() iprovider.ServiceProvider) iprovider.ServiceProvider
 
     // 批量注册服务提供者
-    Registers([]func() provider_interface.ServiceProvider)
+    Registers([]func() iprovider.ServiceProvider)
+
+    // 获取
+    GetRegister(any) iprovider.ServiceProvider
+
+    // 反射获取服务提供者名称
+    GetProviderName(any) string
+
+    // GetLoadedProviders
+    GetLoadedProviders() map[string]bool
+
+    // ProviderIsLoaded
+    ProviderIsLoaded(string) bool
 
     // 脚本
     WithRootCmd(*command.Command)
@@ -39,6 +51,9 @@ type App interface {
 
     // 获取命令行状态
     RunningInConsole() bool
+
+    // 是否为已运行
+    IsRunned() bool
 
     // 是否为开发者模式
     IsDev() bool
