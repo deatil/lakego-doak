@@ -3,6 +3,7 @@ package view
 import (
     "strings"
 
+    "github.com/deatil/lakego-doak/lakego/path"
     "github.com/deatil/lakego-doak/lakego/array"
     "github.com/deatil/lakego-doak/lakego/register"
     "github.com/deatil/lakego-doak/lakego/facade/config"
@@ -11,10 +12,16 @@ import (
     pongo2Adapter "github.com/deatil/lakego-doak/lakego/view/html/adapter/pongo2"
 )
 
+// 默认
+var Default *html.Html
+
 // 初始化
 func init() {
     // 注册默认
-    Register()
+    registerHtml()
+
+    // 默认
+    Default = New()
 }
 
 /**
@@ -67,16 +74,16 @@ func GetDefaultAdapter() string {
 }
 
 // 注册
-func Register() {
+func registerHtml() {
     // 注册驱动
     register.
         NewManagerWithPrefix("view").
         RegisterMany(map[string]func(map[string]any) any {
             "pongo2": func(conf map[string]any) any {
-                path := array.ArrayGet(conf, "tmpl-dir").ToString()
+                p := array.ArrayGet(conf, "tmpl-dir").ToString()
+                p  = path.FormatPath(p)
 
-                adapter := pongo2Adapter.New(path)
-
+                adapter := pongo2Adapter.New(p)
                 return adapter
             },
         })
