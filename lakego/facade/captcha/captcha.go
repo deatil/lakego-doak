@@ -48,21 +48,20 @@ func Captcha(driverName string, storeName string, once ...bool) *captcha.Captcha
     conf := config.New("captcha")
 
     // 存储列表
-    stores := conf.GetStringMap("Stores")
+    stores := array.ArrayFrom(conf.GetStringMap("stores"))
 
     // 转为小写
     storeName = strings.ToLower(storeName)
 
     // 获取配置
-    storeConfig, ok := stores[storeName]
-    if !ok {
+    if !stores.Has(storeName) {
         panic("验证码存储驱动[" + storeName + "]配置不存在")
     }
 
     // 配置
-    storeConf := storeConfig.(map[string]any)
+    storeConf := stores.Value(storeName).ToStringMap()
+    storeType := stores.Value(storeName + ".type").ToString()
 
-    storeType := storeConf["type"].(string)
     store := register.
         NewManagerWithPrefix("captcha-store").
         GetRegister(storeType, storeConf, once...)
@@ -70,22 +69,23 @@ func Captcha(driverName string, storeName string, once ...bool) *captcha.Captcha
         panic("验证码存储驱动[" + storeType + "]没有被注册")
     }
 
+    // ===========
+
     // 驱动列表
-    drivers := conf.GetStringMap("Drivers")
+    drivers := array.ArrayFrom(conf.GetStringMap("drivers"))
 
     // 转为小写
     driverName = strings.ToLower(driverName)
 
     // 获取配置
-    driverConfig, ok := drivers[driverName]
-    if !ok {
+    if !drivers.Has(driverName) {
         panic("验证码驱动[" + driverName + "]配置不存在")
     }
 
     // 驱动配置
-    driverConf := driverConfig.(map[string]any)
+    driverConf := drivers.Value(driverName).ToStringMap()
+    driverType := drivers.Value(driverName + ".type").ToString()
 
-    driverType := driverConf["type"].(string)
     driver := register.
         NewManagerWithPrefix("captcha-driver").
         GetRegister(driverType, driverConf, once...)
